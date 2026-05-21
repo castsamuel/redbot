@@ -9,7 +9,7 @@ import os
 # CONFIG
 # =========================================================
 
-TOKEN = "MTUwNzA1OTMzMjMwNTY1MzkxMA.GPpjFN.Nt9kV0A9SQ8Q38MkYi3aJIugSMU3YanzMKz8Wk"
+TOKEN = "MTUwNzA1OTMzMjMwNTY1MzkxMA.GtKXRy.W2xEqPpXJma-KyRj0nvD9bvSAqI-s4JbjtHrns"
 GUILD_ID = 1506087472910565466
 
 PUNISHMENT_CHANNEL = 1507062463022239924
