@@ -9,7 +9,7 @@ import os
 # CONFIG
 # =========================================================
 
-TOKEN = "MTUwNzA1OTMzMjMwNTY1MzkxMA.GtKXRy.W2xEqPpXJma-KyRj0nvD9bvSAqI-s4JbjtHrns"
+TOKEN = os.getenv("TOKEN")
 GUILD_ID = 1506087472910565466
 
 PUNISHMENT_CHANNEL = 1507062463022239924
