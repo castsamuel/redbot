@@ -914,6 +914,8 @@ async def unban(
 
     await enviar_dm(usuario, dm_embed)
 
+import time
+
 # =========================================================
 # EVENTO XP AUTOMÁTICO
 # =========================================================
@@ -922,10 +924,13 @@ XP_CHANNEL = 1506087473351229592
 
 mensagens_xp = 0
 
+ultimo_evento = 0
+
 @bot.event
 async def on_message(message):
 
     global mensagens_xp
+    global ultimo_evento
 
     if message.author.bot:
         return
@@ -934,9 +939,29 @@ async def on_message(message):
 
         mensagens_xp += 1
 
-        if mensagens_xp >= 5:
+        agora = time.time()
+
+        # =================================================
+        # REQUISITOS
+        # =================================================
+
+        mensagens_necessarias = 15
+
+        cooldown = 600
+        # 600 segundos = 10 minutos
+
+        # =================================================
+        # ENVIO
+        # =================================================
+
+        if (
+            mensagens_xp >= mensagens_necessarias
+            and agora - ultimo_evento >= cooldown
+        ):
 
             mensagens_xp = 0
+
+            ultimo_evento = agora
 
             embed = criar_embed(
                 f"{MARTELO} Evento de XP",
@@ -952,7 +977,6 @@ async def on_message(message):
             await message.channel.send(embed=embed)
 
     await bot.process_commands(message)
-
 # =========================================================
 # RUN
 # =========================================================
