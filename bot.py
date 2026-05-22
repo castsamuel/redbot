@@ -916,67 +916,21 @@ async def unban(
 
 import time
 
-# =========================================================
-# EVENTO XP AUTOMÁTICO
-# =========================================================
+embed = criar_embed(
+    f"{MARTELO} Evento de XP",
+    f"""
+> <:emoji_7:1506459277517131868> . Nosso servidor está realizando um **Evento de XP** com prêmio de **R$ 25 em gift card**, à escolha do vencedor! 🎉
 
-XP_CHANNEL = 1506087473351229592
+> <:blackstar:1507052823773450270> . Quanto mais XP você ganhar, maiores serão suas chances de vencer.
 
-mensagens_xp = 0
-
-ultimo_evento = 0
-
-@bot.event
-async def on_message(message):
-
-    global mensagens_xp
-    global ultimo_evento
-
-    if message.author.bot:
-        return
-
-    if message.channel.id == XP_CHANNEL:
-
-        mensagens_xp += 1
-
-        agora = time.time()
-
-        # =================================================
-        # REQUISITOS
-        # =================================================
-
-        mensagens_necessarias = 15
-
-        cooldown = 600
-        # 600 segundos = 10 minutos
-
-        # =================================================
-        # ENVIO
-        # =================================================
-
-        if (
-            mensagens_xp >= mensagens_necessarias
-            and agora - ultimo_evento >= cooldown
-        ):
-
-            mensagens_xp = 0
-
-            ultimo_evento = agora
-
-            embed = criar_embed(
-                f"{MARTELO} Evento de XP",
-                f"""
-<a:931124car:1507054375905005769> Nosso servidor está realizando um **Evento de XP** com prêmio de **R$ 25 em gift card**, à escolha do vencedor!
-
-<:774156fck:1507054462999462059> Quanto mais XP você ganhar, maiores serão suas chances de vencer.
-
-<:3993search:1507053159489601626> Para conferir todas as informações, regras e detalhes do evento, clique [aqui](https://discord.com/channels/1506087472910565466/1506087472910565469/1507073321865445657).
+> <:red_line2:1506455266940551188> . Para conferir todas as informações, regras e detalhes do evento, clique [aqui](https://discord.com/channels/1506087472910565466/1506087472910565469/1507073321865445657).
 """
-            )
+)
 
-            await message.channel.send(embed=embed)
-
-    await bot.process_commands(message)
+await message.channel.send(
+    embed=embed,
+    delete_after=10
+)
 # =========================================================
 # RUN
 # =========================================================
