@@ -4,11 +4,13 @@ from discord import app_commands
 from datetime import timedelta
 import json
 import os
+
 # =========================================================
 # CONFIG
 # =========================================================
 
 TOKEN = os.getenv("TOKEN")
+
 GUILD_ID = 1506087472910565466
 
 PUNISHMENT_CHANNEL = 1507062463022239924
@@ -88,19 +90,130 @@ def criar_embed(titulo, descricao):
     return embed
 
 # =========================================================
+# DM
+# =========================================================
+
+async def enviar_dm(usuario, embed):
+
+    try:
+        await usuario.send(embed=embed)
+
+    except Exception as e:
+        print(f"ERRO DM: {e}")
+
+# =========================================================
+# VERIFICAR PERMISSÃO
+# =========================================================
+
+async def verificar_permissao(interaction, usuario):
+
+    if usuario.bot:
+
+        embed = criar_embed(
+            f"{CRUZ} Ação Negada",
+            f"""
+{CRUZ} Você não pode punir bots.
+"""
+        )
+
+        await interaction.response.send_message(
+            embed=embed,
+            ephemeral=True
+        )
+
+        return False
+
+    if usuario == interaction.user:
+
+        embed = criar_embed(
+            f"{CRUZ} Ação Negada",
+            f"""
+{CRUZ} Você não pode punir a si mesmo.
+"""
+        )
+
+        await interaction.response.send_message(
+            embed=embed,
+            ephemeral=True
+        )
+
+        return False
+
+    if usuario == interaction.guild.owner:
+
+        embed = criar_embed(
+            f"{CRUZ} Ação Negada",
+            f"""
+{CRUZ} Você não pode punir o dono do servidor.
+"""
+        )
+
+        await interaction.response.send_message(
+            embed=embed,
+            ephemeral=True
+        )
+
+        return False
+
+    if usuario.top_role >= interaction.user.top_role:
+
+        embed = criar_embed(
+            f"{CRUZ} Ação Negada",
+            f"""
+{CRUZ} Você não possui permissão para punir este usuário.
+
+{LINHA} Verifique a hierarquia de cargos.
+"""
+        )
+
+        await interaction.response.send_message(
+            embed=embed,
+            ephemeral=True
+        )
+
+        return False
+
+    if usuario.top_role >= interaction.guild.me.top_role:
+
+        embed = criar_embed(
+            f"{CRUZ} Ação Negada",
+            f"""
+{CRUZ} Meu cargo está abaixo do usuário.
+
+{LINHA} Mova meu cargo para cima.
+"""
+        )
+
+        await interaction.response.send_message(
+            embed=embed,
+            ephemeral=True
+        )
+
+        return False
+
+    return True
+
+# =========================================================
 # READY
 # =========================================================
 
 @bot.event
 async def on_ready():
 
-    guild = discord.Object(id=GUILD_ID)
+    try:
 
-    bot.tree.copy_global_to(guild=guild)
+        guild = discord.Object(id=GUILD_ID)
 
-    synced = await bot.tree.sync(guild=guild)
+        bot.tree.clear_commands(guild=guild)
 
-    print(f"{len(synced)} comandos sincronizados.")
+        synced = await bot.tree.sync(guild=guild)
+
+        print(f"{len(synced)} comandos sincronizados.")
+
+    except Exception as e:
+
+        print(f"ERRO SYNC: {e}")
+
     print(f"{bot.user} online!")
 
 # =========================================================
@@ -119,11 +232,12 @@ async def on_member_join(member):
     adicionou = None
 
     async for entry in member.guild.audit_logs(
-        limit=10,
+        limit=1,
         action=discord.AuditLogAction.bot_add
     ):
 
-        if entry.target.id == member.id:
+        if entry.target.id == member.id and entry.user:
+
             adicionou = entry.user
             break
 
@@ -191,7 +305,117 @@ async def liberarbot(
 
     embed = criar_embed(
         f"{FANTASMA} Bot Liberado",
-        f"{FANTASMA} ID autorizado: `{bot_id}`"
+        f"""
+{FANTASMA} ID autorizado: `{bot_id}`
+"""
+    )
+
+    await interaction.response.send_message(embed=embed)
+
+# =========================================================
+# DESLIBERAR BOT
+# =========================================================
+
+@bot.tree.command(
+    name="desliberar",
+    description="Remove um bot da whitelist."
+)
+async def desliberar(
+    interaction: discord.Interaction,
+    bot_id: str
+):
+
+    if interaction.user.id not in [OWNER_ID, CO_OWNER_ID]:
+
+        embed = criar_embed(
+            f"{CRUZ} Acesso Negado",
+            f"{CRUZ} Você não possui permissão."
+        )
+
+        return await interaction.response.send_message(
+            embed=embed,
+            ephemeral=True
+        )
+
+    if bot_id not in allowed_bots:
+
+        embed = criar_embed(
+            f"{CRUZ} Erro",
+            f"{CRUZ} Este bot não está liberado."
+        )
+
+        return await interaction.response.send_message(
+            embed=embed,
+            ephemeral=True
+        )
+
+    del allowed_bots[bot_id]
+
+    salvar_json("allowed_bots", allowed_bots)
+
+    embed = criar_embed(
+        f"{FANTASMA} Bot Desautorizado",
+        f"""
+{MARTELO} Responsável: {interaction.user.mention}
+
+{FANTASMA} ID removido: `{bot_id}`
+
+{CRUZ} O anti raid voltará a agir normalmente.
+"""
+    )
+
+    await interaction.response.send_message(embed=embed)
+
+# =========================================================
+# BOTS LIBERADOS
+# =========================================================
+
+@bot.tree.command(
+    name="botsliberados",
+    description="Mostra os bots liberados."
+)
+async def botsliberados(
+    interaction: discord.Interaction
+):
+
+    if interaction.user.id not in [OWNER_ID, CO_OWNER_ID]:
+
+        embed = criar_embed(
+            f"{CRUZ} Acesso Negado",
+            f"{CRUZ} Você não possui permissão."
+        )
+
+        return await interaction.response.send_message(
+            embed=embed,
+            ephemeral=True
+        )
+
+    if not allowed_bots:
+
+        embed = criar_embed(
+            f"{FANTASMA} Bots Liberados",
+            f"{CRUZ} Nenhum bot está liberado."
+        )
+
+        return await interaction.response.send_message(embed=embed)
+
+    descricao = ""
+
+    for bot_id in allowed_bots:
+
+        try:
+
+            usuario = await bot.fetch_user(int(bot_id))
+
+            descricao += f"{LINHA} {usuario} (`{bot_id}`)\n"
+
+        except:
+
+            descricao += f"{LINHA} ID desconhecido (`{bot_id}`)\n"
+
+    embed = criar_embed(
+        f"{FANTASMA} Bots Liberados",
+        descricao
     )
 
     await interaction.response.send_message(embed=embed)
@@ -204,9 +428,8 @@ async def liberarbot(
     name="warn",
     description="Aplica uma advertência."
 )
-@app_commands.describe(
-    usuario="Usuário",
-    motivo="Motivo da advertência"
+@app_commands.default_permissions(
+    moderate_members=True
 )
 async def warn(
     interaction: discord.Interaction,
@@ -214,65 +437,8 @@ async def warn(
     motivo: str = "Sem motivo"
 ):
 
-    if usuario.bot:
-
-        embed = criar_embed(
-            f"{CRUZ} Erro",
-            f"{CRUZ} Você não pode advertir bots."
-        )
-
-        return await interaction.response.send_message(
-            embed=embed,
-            ephemeral=True
-        )
-
-    if usuario == interaction.user:
-
-        embed = criar_embed(
-            f"{CRUZ} Erro",
-            f"{CRUZ} Você não pode advertir a si mesmo."
-        )
-
-        return await interaction.response.send_message(
-            embed=embed,
-            ephemeral=True
-        )
-
-    if usuario == interaction.guild.owner:
-
-        embed = criar_embed(
-            f"{CRUZ} Erro",
-            f"{CRUZ} Você não pode punir o dono do servidor."
-        )
-
-        return await interaction.response.send_message(
-            embed=embed,
-            ephemeral=True
-        )
-
-    if usuario.top_role > interaction.user.top_role:
-
-        embed = criar_embed(
-            f"{CRUZ} Erro",
-            f"{CRUZ} Você não pode advertir este usuário."
-        )
-
-        return await interaction.response.send_message(
-            embed=embed,
-            ephemeral=True
-        )
-
-    if usuario.top_role >= interaction.guild.me.top_role:
-
-        embed = criar_embed(
-            f"{CRUZ} Erro",
-            f"{CRUZ} Meu cargo está abaixo do usuário."
-        )
-
-        return await interaction.response.send_message(
-            embed=embed,
-            ephemeral=True
-        )
+    if not await verificar_permissao(interaction, usuario):
+        return
 
     user_id = str(usuario.id)
 
@@ -306,29 +472,31 @@ async def warn(
     if canal:
         await canal.send(embed=embed)
 
-    try:
-
-        dm_embed = criar_embed(
-            f"{MARTELO} Você Recebeu Uma Advertência",
-            f"""
+    dm_embed = criar_embed(
+        f"{MARTELO} Você Recebeu Uma Advertência",
+        f"""
 {MARTELO} Staff: {interaction.user}
 
 {LINHA} Tempo: Permanente
 
 {CRUZ} Motivo: {motivo}
 """
-        )
+    )
 
-        await usuario.send(embed=dm_embed)
-
-    except Exception as e:
-        print(f"ERRO DM WARN: {e}")
-
-    # =====================================================
-    # 3 WARNS = BAN
-    # =====================================================
+    await enviar_dm(usuario, dm_embed)
 
     if len(warns_data[user_id]) >= 3:
+
+        dm_ban = criar_embed(
+            f"{MARTELO} Você Foi Banido",
+            f"""
+{LINHA} Tempo: Permanente
+
+{CRUZ} Motivo: Alcançou 3 advertências
+"""
+        )
+
+        await enviar_dm(usuario, dm_ban)
 
         await usuario.ban(
             reason="Alcançou 3 advertências"
@@ -354,22 +522,6 @@ async def warn(
         if canal:
             await canal.send(embed=auto_ban)
 
-        try:
-
-            dm_ban = criar_embed(
-                f"{MARTELO} Você Foi Banido",
-                f"""
-{LINHA} Tempo: Permanente
-
-{CRUZ} Motivo: Alcançou 3 advertências
-"""
-            )
-
-            await usuario.send(embed=dm_ban)
-
-        except Exception as e:
-            print(f"ERRO DM BAN: {e}")
-
 # =========================================================
 # MUTE
 # =========================================================
@@ -378,10 +530,8 @@ async def warn(
     name="mute",
     description="Silencia um usuário."
 )
-@app_commands.describe(
-    usuario="Usuário",
-    tempo="Tempo em minutos",
-    motivo="Motivo do silenciamento"
+@app_commands.default_permissions(
+    moderate_members=True
 )
 async def mute(
     interaction: discord.Interaction,
@@ -390,65 +540,8 @@ async def mute(
     motivo: str = "Sem motivo"
 ):
 
-    if usuario.bot:
-
-        embed = criar_embed(
-            f"{CRUZ} Erro",
-            f"{CRUZ} Você não pode silenciar bots."
-        )
-
-        return await interaction.response.send_message(
-            embed=embed,
-            ephemeral=True
-        )
-
-    if usuario == interaction.user:
-
-        embed = criar_embed(
-            f"{CRUZ} Erro",
-            f"{CRUZ} Você não pode se silenciar."
-        )
-
-        return await interaction.response.send_message(
-            embed=embed,
-            ephemeral=True
-        )
-
-    if usuario == interaction.guild.owner:
-
-        embed = criar_embed(
-            f"{CRUZ} Erro",
-            f"{CRUZ} Você não pode punir o dono do servidor."
-        )
-
-        return await interaction.response.send_message(
-            embed=embed,
-            ephemeral=True
-        )
-
-    if usuario.top_role > interaction.user.top_role:
-
-        embed = criar_embed(
-            f"{CRUZ} Erro",
-            f"{CRUZ} Você não pode silenciar este usuário."
-        )
-
-        return await interaction.response.send_message(
-            embed=embed,
-            ephemeral=True
-        )
-
-    if usuario.top_role >= interaction.guild.me.top_role:
-
-        embed = criar_embed(
-            f"{CRUZ} Erro",
-            f"{CRUZ} Meu cargo está abaixo do usuário."
-        )
-
-        return await interaction.response.send_message(
-            embed=embed,
-            ephemeral=True
-        )
+    if not await verificar_permissao(interaction, usuario):
+        return
 
     await usuario.timeout(
         timedelta(minutes=tempo),
@@ -488,27 +581,18 @@ async def mute(
     if canal:
         await canal.send(embed=embed)
 
-    try:
-
-        dm_embed = criar_embed(
-            f"{MUTE} Você Foi Silenciado",
-            f"""
+    dm_embed = criar_embed(
+        f"{MUTE} Você Foi Silenciado",
+        f"""
 {MARTELO} Staff: {interaction.user}
 
 {MUTE} Tempo: {tempo} minuto(s)
 
 {CRUZ} Motivo: {motivo}
 """
-        )
+    )
 
-        await usuario.send(embed=dm_embed)
-
-    except Exception as e:
-        print(f"ERRO DM MUTE: {e}")
-
-    # =====================================================
-    # 3 MUTES = WARN
-    # =====================================================
+    await enviar_dm(usuario, dm_embed)
 
     if len(mutes_data[user_id]) >= 3:
 
@@ -542,27 +626,29 @@ async def mute(
         if canal:
             await canal.send(embed=auto_warn)
 
-        try:
-
-            dm_warn = criar_embed(
-                f"{MARTELO} Advertência Automática",
-                f"""
+        dm_warn = criar_embed(
+            f"{MARTELO} Advertência Automática",
+            f"""
 {LINHA} Tempo: Permanente
 
 {CRUZ} Motivo: Alcançou 3 silenciamentos
 """
-            )
+        )
 
-            await usuario.send(embed=dm_warn)
-
-        except Exception as e:
-            print(f"ERRO DM AUTO WARN: {e}")
-
-        # =================================================
-        # 3 WARNS = BAN
-        # =================================================
+        await enviar_dm(usuario, dm_warn)
 
         if len(warns_data[user_id]) >= 3:
+
+            dm_ban = criar_embed(
+                f"{MARTELO} Você Foi Banido",
+                f"""
+{LINHA} Tempo: Permanente
+
+{CRUZ} Motivo: Alcançou 3 advertências
+"""
+            )
+
+            await enviar_dm(usuario, dm_ban)
 
             await usuario.ban(
                 reason="Alcançou 3 advertências"
@@ -588,22 +674,6 @@ async def mute(
             if canal:
                 await canal.send(embed=auto_ban)
 
-            try:
-
-                dm_ban = criar_embed(
-                    f"{MARTELO} Você Foi Banido",
-                    f"""
-{LINHA} Tempo: Permanente
-
-{CRUZ} Motivo: Alcançou 3 advertências
-"""
-                )
-
-                await usuario.send(embed=dm_ban)
-
-            except Exception as e:
-                print(f"ERRO DM AUTO BAN: {e}")
-
 # =========================================================
 # UNMUTE
 # =========================================================
@@ -612,10 +682,16 @@ async def mute(
     name="unmute",
     description="Remove o silenciamento."
 )
+@app_commands.default_permissions(
+    moderate_members=True
+)
 async def unmute(
     interaction: discord.Interaction,
     usuario: discord.Member
 ):
+
+    if not await verificar_permissao(interaction, usuario):
+        return
 
     await usuario.timeout(None)
 
@@ -639,21 +715,16 @@ async def unmute(
     if canal:
         await canal.send(embed=embed)
 
-    try:
-
-        dm_embed = criar_embed(
-            f"{MUTE} Você Foi Dessilenciado",
-            f"""
+    dm_embed = criar_embed(
+        f"{MUTE} Você Foi Dessilenciado",
+        f"""
 {MARTELO} Staff: {interaction.user}
 
 {CRUZ} Seu silenciamento foi removido.
 """
-        )
+    )
 
-        await usuario.send(embed=dm_embed)
-
-    except Exception as e:
-        print(f"ERRO DM UNMUTE: {e}")
+    await enviar_dm(usuario, dm_embed)
 
 # =========================================================
 # HISTÓRICO
@@ -662,6 +733,9 @@ async def unmute(
 @bot.tree.command(
     name="historico",
     description="Mostra o histórico do usuário."
+)
+@app_commands.default_permissions(
+    moderate_members=True
 )
 async def historico(
     interaction: discord.Interaction,
@@ -712,9 +786,8 @@ async def historico(
     name="ban",
     description="Bane um usuário."
 )
-@app_commands.describe(
-    usuario="Usuário",
-    motivo="Motivo do banimento"
+@app_commands.default_permissions(
+    ban_members=True
 )
 async def ban(
     interaction: discord.Interaction,
@@ -722,103 +795,25 @@ async def ban(
     motivo: str = "Sem motivo"
 ):
 
-    # =====================================================
-    # VERIFICAÇÕES
-    # =====================================================
+    if not await verificar_permissao(interaction, usuario):
+        return
 
-    if usuario.bot:
-
-        embed = criar_embed(
-            f"{CRUZ} Erro",
-            f"{CRUZ} Você não pode banir bots."
-        )
-
-        return await interaction.response.send_message(
-            embed=embed,
-            ephemeral=True
-        )
-
-    if usuario == interaction.user:
-
-        embed = criar_embed(
-            f"{CRUZ} Erro",
-            f"{CRUZ} Você não pode se banir."
-        )
-
-        return await interaction.response.send_message(
-            embed=embed,
-            ephemeral=True
-        )
-
-    if usuario == interaction.guild.owner:
-
-        embed = criar_embed(
-            f"{CRUZ} Erro",
-            f"{CRUZ} Você não pode banir o dono do servidor."
-        )
-
-        return await interaction.response.send_message(
-            embed=embed,
-            ephemeral=True
-        )
-
-    if usuario.top_role > interaction.user.top_role:
-
-        embed = criar_embed(
-            f"{CRUZ} Erro",
-            f"{CRUZ} Você não pode banir este usuário."
-        )
-
-        return await interaction.response.send_message(
-            embed=embed,
-            ephemeral=True
-        )
-
-    if usuario.top_role >= interaction.guild.me.top_role:
-
-        embed = criar_embed(
-            f"{CRUZ} Erro",
-            f"{CRUZ} Meu cargo está abaixo do usuário."
-        )
-
-        return await interaction.response.send_message(
-            embed=embed,
-            ephemeral=True
-        )
-
-    # =====================================================
-    # DM
-    # =====================================================
-
-    try:
-
-        dm_embed = criar_embed(
-            f"{MARTELO} Você Foi Banido",
-            f"""
+    dm_embed = criar_embed(
+        f"{MARTELO} Você Foi Banido",
+        f"""
 {MARTELO} Staff: {interaction.user}
 
 {LINHA} Tempo: Permanente
 
 {CRUZ} Motivo: {motivo}
 """
-        )
+    )
 
-        await usuario.send(embed=dm_embed)
-
-    except Exception as e:
-        print(f"ERRO DM BAN: {e}")
-
-    # =====================================================
-    # BAN
-    # =====================================================
+    await enviar_dm(usuario, dm_embed)
 
     await usuario.ban(
         reason=motivo
     )
-
-    # =====================================================
-    # EMBED
-    # =====================================================
 
     embed = criar_embed(
         f"{MARTELO} Banimento Aplicado",
@@ -846,10 +841,10 @@ async def ban(
 
 @bot.tree.command(
     name="unban",
-    description="Remove o banimento de um usuário."
+    description="Remove o banimento."
 )
-@app_commands.describe(
-    usuario_id="ID do usuário"
+@app_commands.default_permissions(
+    ban_members=True
 )
 async def unban(
     interaction: discord.Interaction,
@@ -908,169 +903,17 @@ async def unban(
     if canal:
         await canal.send(embed=embed)
 
-    # =====================================================
-    # DM
-    # =====================================================
-
-    try:
-
-        dm_embed = criar_embed(
-            f"{MARTELO} Você Foi Desbanido",
-            f"""
+    dm_embed = criar_embed(
+        f"{MARTELO} Você Foi Desbanido",
+        f"""
 {MARTELO} Staff: {interaction.user}
 
 {CRUZ} Seu banimento foi removido.
 """
-        )
-
-        await usuario.send(embed=dm_embed)
-
-    except Exception as e:
-        print(f"ERRO DM UNBAN: {e}")
-
-# =========================================================
-# DESLIBERAR BOT
-# =========================================================
-
-@bot.tree.command(
-    name="desliberar",
-    description="Remove um bot da whitelist do anti raid."
-)
-@app_commands.describe(
-    bot_id="ID do bot"
-)
-async def desliberar(
-    interaction: discord.Interaction,
-    bot_id: str
-):
-
-    # =====================================================
-    # PERMISSÃO
-    # =====================================================
-
-    if interaction.user.id not in [OWNER_ID, CO_OWNER_ID]:
-
-        embed = criar_embed(
-            f"{CRUZ} Acesso Negado",
-            f"{CRUZ} Você não possui permissão."
-        )
-
-        return await interaction.response.send_message(
-            embed=embed,
-            ephemeral=True
-        )
-
-    # =====================================================
-    # VERIFICAÇÃO
-    # =====================================================
-
-    if bot_id not in allowed_bots:
-
-        embed = criar_embed(
-            f"{CRUZ} Erro",
-            f"{CRUZ} Este bot não está liberado."
-        )
-
-        return await interaction.response.send_message(
-            embed=embed,
-            ephemeral=True
-        )
-
-    # =====================================================
-    # REMOVER
-    # =====================================================
-
-    del allowed_bots[bot_id]
-
-    salvar_json("allowed_bots", allowed_bots)
-
-    # =====================================================
-    # EMBED
-    # =====================================================
-
-    embed = criar_embed(
-        f"{FANTASMA} Bot Desautorizado",
-        f"""
-{MARTELO} Responsável: {interaction.user.mention}
-
-{FANTASMA} ID removido: `{bot_id}`
-
-{CRUZ} O anti raid voltará a agir normalmente.
-"""
     )
 
-    await interaction.response.send_message(embed=embed)
-    # =========================================================
-# BOTS LIBERADOS
-# =========================================================
+    await enviar_dm(usuario, dm_embed)
 
-@bot.tree.command(
-    name="botsliberados",
-    description="Mostra todos os bots liberados no anti raid."
-)
-async def botsliberados(
-    interaction: discord.Interaction
-):
-
-    # =====================================================
-    # PERMISSÃO
-    # =====================================================
-
-    if interaction.user.id not in [OWNER_ID, CO_OWNER_ID]:
-
-        embed = criar_embed(
-            f"{CRUZ} Acesso Negado",
-            f"{CRUZ} Você não possui permissão."
-        )
-
-        return await interaction.response.send_message(
-            embed=embed,
-            ephemeral=True
-        )
-
-    # =====================================================
-    # VERIFICAÇÃO
-    # =====================================================
-
-    if not allowed_bots:
-
-        embed = criar_embed(
-            f"{FANTASMA} Bots Liberados",
-            f"{CRUZ} Nenhum bot está liberado."
-        )
-
-        return await interaction.response.send_message(
-            embed=embed
-        )
-
-    # =====================================================
-    # LISTA
-    # =====================================================
-
-    descricao = ""
-
-    for bot_id in allowed_bots:
-
-        try:
-
-            usuario = await bot.fetch_user(int(bot_id))
-
-            descricao += f"{LINHA} {usuario} (`{bot_id}`)\n"
-
-        except:
-
-            descricao += f"{LINHA} ID desconhecido (`{bot_id}`)\n"
-
-    # =====================================================
-    # EMBED
-    # =====================================================
-
-    embed = criar_embed(
-        f"{FANTASMA} Bots Liberados",
-        descricao
-    )
-
-    await interaction.response.send_message(embed=embed)
 # =========================================================
 # RUN
 # =========================================================
