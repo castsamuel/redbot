@@ -916,21 +916,73 @@ async def unban(
 
 import time
 
-embed = criar_embed(
-    f"{MARTELO} Evento de XP",
-    f"""
+# =========================================================
+# EVENTO XP
+# =========================================================
+
+XP_CHANNEL = 1506087473351229592
+
+mensagens_xp = 0
+
+ultimo_evento = 0
+
+COOLDOWN_EVENTO = 600
+# 10 minutos
+
+MENSAGENS_NECESSARIAS = 15
+
+@bot.event
+async def on_message(message):
+
+    global mensagens_xp
+    global ultimo_evento
+
+    if message.author.bot:
+        return
+
+    # =====================================================
+    # CHAT DO EVENTO
+    # =====================================================
+
+    if message.channel.id == XP_CHANNEL:
+
+        agora = time.time()
+
+        # =================================================
+        # COOLDOWN
+        # =================================================
+
+        if agora - ultimo_evento >= COOLDOWN_EVENTO:
+
+            mensagens_xp += 1
+
+            # =============================================
+            # ENVIA EVENTO
+            # =============================================
+
+            if mensagens_xp >= MENSAGENS_NECESSARIAS:
+
+                mensagens_xp = 0
+
+                ultimo_evento = agora
+
+                embed = criar_embed(
+                    f"{MARTELO} Evento de XP",
+                    f"""
 > <:emoji_7:1506459277517131868> . Nosso servidor está realizando um **Evento de XP** com prêmio de **R$ 25 em gift card**, à escolha do vencedor! 🎉
 
 > <:blackstar:1507052823773450270> . Quanto mais XP você ganhar, maiores serão suas chances de vencer.
 
 > <:red_line2:1506455266940551188> . Para conferir todas as informações, regras e detalhes do evento, clique [aqui](https://discord.com/channels/1506087472910565466/1506087472910565469/1507073321865445657).
 """
-)
+                )
 
-await message.channel.send(
-    embed=embed,
-    delete_after=10
-)
+                await message.channel.send(
+                    embed=embed,
+                    delete_after=10
+                )
+
+    await bot.process_commands(message)
 # =========================================================
 # RUN
 # =========================================================
