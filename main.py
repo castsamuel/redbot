@@ -9,7 +9,7 @@ import os
 # CONFIG
 # =========================================================
 
-TOKEN = os.getenv("TOKEN")
+TOKEN = 
 
 GUILD_ID = 1506087472910565466
 
@@ -913,6 +913,45 @@ async def unban(
     )
 
     await enviar_dm(usuario, dm_embed)
+
+# =========================================================
+# EVENTO XP AUTOMÁTICO
+# =========================================================
+
+XP_CHANNEL = 1506087473351229592
+
+mensagens_xp = 0
+
+@bot.event
+async def on_message(message):
+
+    global mensagens_xp
+
+    if message.author.bot:
+        return
+
+    if message.channel.id == XP_CHANNEL:
+
+        mensagens_xp += 1
+
+        if mensagens_xp >= 5:
+
+            mensagens_xp = 0
+
+            embed = criar_embed(
+                f"{MARTELO} Evento de XP",
+                f"""
+<a:931124car:1507054375905005769> Nosso servidor está realizando um **Evento de XP** com prêmio de **R$ 25 em gift card**, à escolha do vencedor!
+
+<:774156fck:1507054462999462059> Quanto mais XP você ganhar, maiores serão suas chances de vencer.
+
+<:3993search:1507053159489601626> Para conferir todas as informações, regras e detalhes do evento, clique [aqui](https://discord.com/channels/1506087472910565466/1506087472910565469/1507073321865445657).
+"""
+            )
+
+            await message.channel.send(embed=embed)
+
+    await bot.process_commands(message)
 
 # =========================================================
 # RUN
