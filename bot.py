@@ -985,6 +985,38 @@ async def on_message(message):
     await bot.process_commands(message)
 
 # =========================================================
+# PASTA
+# =========================================================
+
+BACKUP_FOLDER = "backups"
+
+os.makedirs(
+    BACKUP_FOLDER,
+    exist_ok=True
+)
+
+# =========================================================
+# EMBED
+# =========================================================
+
+def criar_embed(
+    titulo,
+    descricao
+):
+
+    embed = discord.Embed(
+        title=titulo,
+        description=descricao,
+        color=COLOR
+    )
+
+    embed.set_footer(
+        text="Red's Assistant"
+    )
+
+    return embed
+
+# =========================================================
 # CREATE BACKUP
 # =========================================================
 
@@ -997,12 +1029,24 @@ async def create_backup(
     )
 
     data = {
-        "guild_name": guild.name,
-        "roles": [],
-        "categories": [],
-        "channels": [],
-        "members": [],
-        "created_at": int(time.time())
+
+        "guild_name":
+        guild.name,
+
+        "roles":
+        [],
+
+        "categories":
+        [],
+
+        "channels":
+        [],
+
+        "members":
+        [],
+
+        "created_at":
+        int(time.time())
     }
 
     # =====================================================
@@ -1021,7 +1065,8 @@ async def create_backup(
 
         data["roles"].append({
 
-            "name": role.name,
+            "name":
+            role.name,
 
             "permissions":
             role.permissions.value,
@@ -1426,10 +1471,6 @@ async def auto_backup():
     if not canal:
         return
 
-    # =====================================================
-    # SERVIDOR FIXO
-    # =====================================================
-
     guild = bot.get_guild(
         GUILD_ID
     )
@@ -1476,7 +1517,8 @@ async def auto_backup():
 
 @bot.tree.command(
     name="backup_load",
-    description="Restaura um backup."
+    description="Restaura um backup.",
+    guild=discord.Object(id=GUILD_ID)
 )
 @app_commands.describe(
     backup_id="ID do backup"
@@ -1546,7 +1588,6 @@ async def backup_load(
                 f"{CRUZ} Backup não encontrado."
             )
         )
-
 # =========================================================
 # RUN
 # =========================================================
