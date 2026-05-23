@@ -983,6 +983,570 @@ async def on_message(message):
                 )
 
     await bot.process_commands(message)
+
+# =========================================================
+# CREATE BACKUP
+# =========================================================
+
+async def create_backup(
+    guild: discord.Guild
+):
+
+    backup_id = str(
+        int(time.time())
+    )
+
+    data = {
+        "guild_name": guild.name,
+        "roles": [],
+        "categories": [],
+        "channels": [],
+        "members": [],
+        "created_at": int(time.time())
+    }
+
+    # =====================================================
+    # ROLES
+    # =====================================================
+
+    roles = sorted(
+        guild.roles,
+        key=lambda r: r.position
+    )
+
+    for role in roles:
+
+        if role.is_default():
+            continue
+
+        data["roles"].append({
+
+            "name": role.name,
+
+            "permissions":
+            role.permissions.value,
+
+            "color":
+            role.color.value,
+
+            "hoist":
+            role.hoist,
+
+            "mentionable":
+            role.mentionable,
+
+            "position":
+            role.position
+        })
+
+    # =====================================================
+    # CATEGORIES
+    # =====================================================
+
+    for category in guild.categories:
+
+        data["categories"].append({
+
+            "name":
+            category.name,
+
+            "position":
+            category.position
+        })
+
+    # =====================================================
+    # CHANNELS
+    # =====================================================
+
+    for channel in guild.channels:
+
+        channel_data = {
+
+            "name":
+            channel.name,
+
+            "type":
+            str(channel.type),
+
+            "position":
+            channel.position,
+
+            "category":
+            (
+                channel.category.name
+                if channel.category
+                else None
+            )
+        }
+
+        # =================================================
+        # TEXT CHANNEL
+        # =================================================
+
+        if isinstance(
+            channel,
+            discord.TextChannel
+        ):
+
+            channel_data["topic"] = (
+                channel.topic
+            )
+
+            channel_data["slowmode_delay"] = (
+                channel.slowmode_delay
+            )
+
+            channel_data["nsfw"] = (
+                channel.nsfw
+            )
+
+        # =================================================
+        # VOICE CHANNEL
+        # =================================================
+
+        elif isinstance(
+            channel,
+            discord.VoiceChannel
+        ):
+
+            channel_data["bitrate"] = (
+                channel.bitrate
+            )
+
+            channel_data["user_limit"] = (
+                channel.user_limit
+            )
+
+        data["channels"].append(
+            channel_data
+        )
+
+    # =====================================================
+    # MEMBERS
+    # =====================================================
+
+    for member in guild.members:
+
+        roles = [
+
+            r.name
+
+            for r in member.roles
+
+            if not r.is_default()
+        ]
+
+        data["members"].append({
+
+            "id":
+            member.id,
+
+            "roles":
+            roles
+        })
+
+    # =====================================================
+    # SAVE
+    # =====================================================
+
+    path = (
+        f"{BACKUP_FOLDER}/"
+        f"{backup_id}.json"
+    )
+
+    with open(
+        path,
+        "w",
+        encoding="utf-8"
+    ) as f:
+
+        json.dump(
+            data,
+            f,
+            indent=4,
+            ensure_ascii=False
+        )
+
+    return backup_id, path
+
+# =========================================================
+# LOAD BACKUP
+# =========================================================
+
+async def load_backup(
+    guild: discord.Guild,
+    backup_id: str
+):
+
+    path = (
+        f"{BACKUP_FOLDER}/"
+        f"{backup_id}.json"
+    )
+
+    # =====================================================
+    # EXISTE?
+    # =====================================================
+
+    if not os.path.exists(path):
+        return False
+
+    # =====================================================
+    # LOAD JSON
+    # =====================================================
+
+    with open(
+        path,
+        "r",
+        encoding="utf-8"
+    ) as f:
+
+        data = json.load(f)
+
+    # =====================================================
+    # DELETE CHANNELS
+    # =====================================================
+
+    for channel in guild.channels:
+
+        try:
+
+            await channel.delete()
+
+            await asyncio.sleep(0.7)
+
+        except:
+            pass
+
+    # =====================================================
+    # DELETE ROLES
+    # =====================================================
+
+    for role in guild.roles:
+
+        if role.is_default():
+            continue
+
+        try:
+
+            await role.delete()
+
+            await asyncio.sleep(0.7)
+
+        except:
+            pass
+
+    # =====================================================
+    # CREATE ROLES
+    # =====================================================
+
+    created_roles = {}
+
+    sorted_roles = sorted(
+        data["roles"],
+        key=lambda r: r["position"]
+    )
+
+    for role_data in sorted_roles:
+
+        try:
+
+            role = await guild.create_role(
+
+                name=role_data["name"],
+
+                permissions=discord.Permissions(
+                    role_data["permissions"]
+                ),
+
+                colour=discord.Colour(
+                    role_data["color"]
+                ),
+
+                hoist=role_data["hoist"],
+
+                mentionable=role_data[
+                    "mentionable"
+                ]
+            )
+
+            created_roles[
+                role.name
+            ] = role
+
+            await asyncio.sleep(0.7)
+
+        except:
+            pass
+
+    # =====================================================
+    # CREATE CATEGORIES
+    # =====================================================
+
+    created_categories = {}
+
+    for category_data in data["categories"]:
+
+        try:
+
+            category = await guild.create_category(
+
+                name=category_data["name"]
+            )
+
+            created_categories[
+                category.name
+            ] = category
+
+            await asyncio.sleep(0.7)
+
+        except:
+            pass
+
+    # =====================================================
+    # CREATE CHANNELS
+    # =====================================================
+
+    for channel_data in data["channels"]:
+
+        try:
+
+            category = None
+
+            if channel_data["category"]:
+
+                category = created_categories.get(
+                    channel_data["category"]
+                )
+
+            # =============================================
+            # TEXT CHANNEL
+            # =============================================
+
+            if channel_data["type"] == "text":
+
+                await guild.create_text_channel(
+
+                    name=channel_data["name"],
+
+                    category=category,
+
+                    topic=channel_data.get(
+                        "topic"
+                    ),
+
+                    slowmode_delay=channel_data.get(
+                        "slowmode_delay",
+                        0
+                    ),
+
+                    nsfw=channel_data.get(
+                        "nsfw",
+                        False
+                    )
+                )
+
+            # =============================================
+            # VOICE CHANNEL
+            # =============================================
+
+            elif channel_data["type"] == "voice":
+
+                await guild.create_voice_channel(
+
+                    name=channel_data["name"],
+
+                    category=category,
+
+                    bitrate=channel_data.get(
+                        "bitrate",
+                        64000
+                    ),
+
+                    user_limit=channel_data.get(
+                        "user_limit",
+                        0
+                    )
+                )
+
+            await asyncio.sleep(0.7)
+
+        except:
+            pass
+
+    # =====================================================
+    # RESTORE MEMBER ROLES
+    # =====================================================
+
+    for member_data in data["members"]:
+
+        member = guild.get_member(
+            member_data["id"]
+        )
+
+        if not member:
+            continue
+
+        roles_to_add = []
+
+        for role_name in member_data["roles"]:
+
+            role = created_roles.get(
+                role_name
+            )
+
+            if role:
+                roles_to_add.append(
+                    role
+                )
+
+        try:
+
+            await member.add_roles(
+                *roles_to_add
+            )
+
+            await asyncio.sleep(0.5)
+
+        except:
+            pass
+
+    return True
+
+# =========================================================
+# AUTO BACKUP 12H
+# =========================================================
+
+@tasks.loop(hours=12)
+async def auto_backup():
+
+    canal = bot.get_channel(
+        BACKUP_CHANNEL
+    )
+
+    if not canal:
+        return
+
+    # =====================================================
+    # SERVIDOR FIXO
+    # =====================================================
+
+    guild = bot.get_guild(
+        GUILD_ID
+    )
+
+    if not guild:
+        return
+
+    try:
+
+        backup_id, path = await create_backup(
+            guild
+        )
+
+        embed = criar_embed(
+            f"{FANTASMA} Backup Automático",
+            f"""
+{MEMBRO} Servidor: {guild.name}
+
+{FANTASMA} Backup ID: `{backup_id}`
+
+{MARTELO} Backup automático realizado.
+"""
+        )
+
+        await canal.send(
+
+            embed=embed,
+
+            file=discord.File(
+                path,
+                filename=f"{backup_id}.json"
+            )
+        )
+
+    except Exception as e:
+
+        print(
+            f"ERRO BACKUP: {e}"
+        )
+
+# =========================================================
+# BACKUP LOAD
+# =========================================================
+
+@bot.tree.command(
+    name="backup_load",
+    description="Restaura um backup."
+)
+@app_commands.describe(
+    backup_id="ID do backup"
+)
+async def backup_load(
+    interaction: discord.Interaction,
+    backup_id: str
+):
+
+    # =====================================================
+    # PERMISSÃO
+    # =====================================================
+
+    if interaction.user.id not in [
+        OWNER_ID,
+        CO_OWNER_ID
+    ]:
+
+        embed = criar_embed(
+            f"{CRUZ} Acesso Negado",
+            f"{CRUZ} Você não possui permissão."
+        )
+
+        return await interaction.response.send_message(
+            embed=embed,
+            ephemeral=True
+        )
+
+    # =====================================================
+    # INÍCIO
+    # =====================================================
+
+    await interaction.response.send_message(
+        embed=criar_embed(
+            f"{FANTASMA} Restauração Iniciada",
+            f"{CRUZ} O servidor será reconstruído."
+        )
+    )
+
+    # =====================================================
+    # RESTORE
+    # =====================================================
+
+    success = await load_backup(
+        interaction.guild,
+        backup_id
+    )
+
+    # =====================================================
+    # RESULTADO
+    # =====================================================
+
+    if success:
+
+        await interaction.followup.send(
+            embed=criar_embed(
+                f"{MARTELO} Backup Restaurado",
+                f"{MARTELO} O backup foi restaurado com sucesso."
+            )
+        )
+
+    else:
+
+        await interaction.followup.send(
+            embed=criar_embed(
+                f"{CRUZ} Erro",
+                f"{CRUZ} Backup não encontrado."
+            )
+        )
+
 # =========================================================
 # RUN
 # =========================================================
